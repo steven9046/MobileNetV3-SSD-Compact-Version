@@ -9,16 +9,29 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # Label map
-voc_labels = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-              'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+voc_labels = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 
+'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 
+'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 
+'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 
+'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 
+'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+
 label_map = {k: v + 1 for v, k in enumerate(voc_labels)}
 label_map['background'] = 0
 rev_label_map = {v: k for k, v in label_map.items()}  # Inverse mapping
 
 # Color map for bounding boxes of detected objects from https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
-distinct_colors = ['#e6194b', '#3cb44b', '#ffe119', '#0082c8', '#f58231', '#911eb4', '#46f0f0', '#f032e6',
-                   '#d2f53c', '#fabebe', '#008080', '#000080', '#aa6e28', '#fffac8', '#800000', '#aaffc3', '#808000',
-                   '#ffd8b1', '#e6beff', '#808080', '#FFFFFF']
+distinct_colors = ['#990033', '#CC6699', '#FF6699', '#FF3366', '#993366', '#CC0066', '#CC0033', '#FF0066',
+'#FF66FF', '#CC33CC', '#CC00FF', '#FF33FF', '#CC99FF', '#9900CC', '#FF00FF', '#CC66FF',
+'#660099', '#9933FF', '#9933CC', '#666699', '#660066', '#333366', '#0066CC', '#3366FF',
+'#FFFFCC', '#FFCC00', '#000033', '#663300', '#FF6600', '#663333', '#CC6666', '#FF6666',
+'#99FFFF', '#33CCCC', '#00CC99', '#99FF99', '#009966', '#33FF33', '#33FF00', '#99CC33',
+'#669900', '#99CC66', '#99FF66', '#00FF99', '#33FF99', '#66FF99', '#CCFF99', '#33FFFF',
+'#CC6600', '#FF6633', '#996633', '#CC9999', '#FF3333', '#990000', '#CC9966', '#FFFF33',
+'#0033FF', '#66CCFF', '#330066', '#3366FF', '#3399FF', '#6600FF', '#3366CC', '#6699CC',
+'#CC33FF', '#CC99CC', '#990066', '#993399', '#CC66CC', '#CC00CC', '#663366', '#CC0099',
+'#CCFFCC', '#00FF00', '#00CC00', '#CCFF66', '#CCCC66', '#009999', '#003333', '#006633','#FFFFFF']
+
 label_color_map = {k: distinct_colors[i] for i, k in enumerate(label_map.keys())}
 
 
@@ -49,8 +62,7 @@ def parse_annotation(annotation_path):
 
     return {'boxes': boxes, 'labels': labels, 'difficulties': difficulties}
 
-
-def create_data_lists(voc07_path, voc12_path, output_folder):# 
+def create_data_lists(coco_val_path, output_folder):# coco_train_path, 
     """
     Create lists of images, the bounding boxes and labels of the objects in these images, and save these to file.
 
@@ -58,26 +70,30 @@ def create_data_lists(voc07_path, voc12_path, output_folder):#
     :param voc12_path: path to the 'VOC2012' folder
     :param output_folder: folder where the JSONs must be saved
     """
-    voc07_path = os.path.abspath(voc07_path)
-    voc12_path = os.path.abspath(voc12_path)
+
+    # 路径
+    # coco_train_path = os.path.abspath(coco_train_path)
+    coco_val_path = os.path.abspath(coco_val_path)
 
     train_images = list()
     train_objects = list()
     n_objects = 0
 
     # Training data
-    for path in [voc07_path, voc12_path]:#
+    # 遍历路径
+    for path in [coco_val_path]:#coco_train_path, 
 
         # Find IDs of images in training data
-        with open(os.path.join(path, 'ImageSets/Main/trainval.txt')) as f:
+        with open(os.path.join(path, 'image_idx.txt')) as f:
             ids = f.read().splitlines()# 这里是图片编号
 
         for id in ids:
-            # Parse annotation's XML file
+            # 通过图片的id找到对应的xml标注，这里就是正常的xml
+            # 返回的是一个dic
             objects = parse_annotation(os.path.join(path, 'Annotations', id + '.xml'))
-            if len(objects) == 0:
+            if len(objects) == 0:# 如果没有标注，那么跳过
                 continue
-            n_objects += len(objects)
+            n_objects += len(objects)#
             train_objects.append(objects)
             train_images.append(os.path.join(path, 'JPEGImages', id + '.jpg'))
 
@@ -94,34 +110,34 @@ def create_data_lists(voc07_path, voc12_path, output_folder):#
     print('\nThere are %d training images containing a total of %d objects. Files have been saved to %s.' % (
         len(train_images), n_objects, os.path.abspath(output_folder)))
 
-    # Test data
-    test_images = list()
-    test_objects = list()
-    n_objects = 0
+    # # Test data
+    # test_images = list()
+    # test_objects = list()
+    # n_objects = 0
 
-    # Find IDs of images in the test data
-    with open(os.path.join(voc07_path, 'ImageSets/Main/test.txt')) as f:
-        ids = f.read().splitlines()
+    # # Find IDs of images in the test data
+    # with open(os.path.join(voc07_path, 'ImageSets/Main/test.txt')) as f:
+    #     ids = f.read().splitlines()
 
-    for id in ids:
-        # Parse annotation's XML file
-        objects = parse_annotation(os.path.join(voc07_path, 'Annotations', id + '.xml'))
-        if len(objects) == 0:
-            continue
-        test_objects.append(objects)
-        n_objects += len(objects)
-        test_images.append(os.path.join(voc07_path, 'JPEGImages', id + '.jpg'))
+    # for id in ids:
+    #     # Parse annotation's XML file
+    #     objects = parse_annotation(os.path.join(voc07_path, 'Annotations', id + '.xml'))
+    #     if len(objects) == 0:
+    #         continue
+    #     test_objects.append(objects)
+    #     n_objects += len(objects)
+    #     test_images.append(os.path.join(voc07_path, 'JPEGImages', id + '.jpg'))
 
-    assert len(test_objects) == len(test_images)
+    # assert len(test_objects) == len(test_images)
 
-    # Save to file
-    with open(os.path.join(output_folder, 'TEST_images.json'), 'w') as j:
-        json.dump(test_images, j)
-    with open(os.path.join(output_folder, 'TEST_objects.json'), 'w') as j:
-        json.dump(test_objects, j)
+    # # Save to file
+    # with open(os.path.join(output_folder, 'TEST_images.json'), 'w') as j:
+    #     json.dump(test_images, j)
+    # with open(os.path.join(output_folder, 'TEST_objects.json'), 'w') as j:
+    #     json.dump(test_objects, j)
 
-    print('\nThere are %d test images containing a total of %d objects. Files have been saved to %s.' % (
-        len(test_images), n_objects, os.path.abspath(output_folder)))
+    # print('\nThere are %d test images containing a total of %d objects. Files have been saved to %s.' % (
+    #     len(test_images), n_objects, os.path.abspath(output_folder)))
 
 
 def decimate(tensor, m):
@@ -277,7 +293,7 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
 
     return average_precisions, mean_average_precision
 
-
+# label 里 box 计量方式转换，要使这里的w,h=0，那么就是maxy和miny相等
 def xy_to_cxcy(xy):
     """
     Convert bounding boxes from boundary coordinates (x_min, y_min, x_max, y_max) to center-size coordinates (c_x, c_y, w, h).
@@ -285,8 +301,12 @@ def xy_to_cxcy(xy):
     :param xy: bounding boxes in boundary coordinates, a tensor of size (n_boxes, 4)
     :return: bounding boxes in center-size coordinates, a tensor of size (n_boxes, 4)
     """
-    return torch.cat([(xy[:, 2:] + xy[:, :2]) / 2,  # c_x, c_y
-                      xy[:, 2:] - xy[:, :2]], 1)  # w, h
+    # for idx, tensor in enumerate(xy[:, 2:] - xy[:, :2]):
+    #     if float(0) in tensor:
+    #         print("get a bad cxcy while converting:")
+    #         print(xy[idx])
+    return torch.cat([(xy[:, 2:] + xy[:, :2]) / 2,  # c_x, c_y   cx=(xmin + xmax)/2 cy=(ymin + ymax)/2
+                      xy[:, 2:] - xy[:, :2]], 1)  # w, h   w=xmax-xmin h=ymax-ymin
 
 
 def cxcy_to_xy(cxcy):
@@ -299,7 +319,7 @@ def cxcy_to_xy(cxcy):
     return torch.cat([cxcy[:, :2] - (cxcy[:, 2:] / 2),  # x_min, y_min
                       cxcy[:, :2] + (cxcy[:, 2:] / 2)], 1)  # x_max, y_max
 
-
+# 这个是编码，把label里的box编码成和prior box相关的东西，然后训练网络输出这个编码，预测的时候解码就可以了
 def cxcy_to_gcxgcy(cxcy, priors_cxcy):
     """
     Encode bounding boxes (that are in center-size form) w.r.t. the corresponding prior boxes (that are in center-size form).
@@ -309,18 +329,25 @@ def cxcy_to_gcxgcy(cxcy, priors_cxcy):
 
     In the model, we are predicting bounding box coordinates in this encoded form.
 
-    :param cxcy: bounding boxes in center-size coordinates, a tensor of size (n_priors, 4)
+    :param cxcy: bounding boxes in center-size coordinates, a tensor of size (n_priors, 4) 每个prior对应的box,但是有的prior应该没有对应的box啊？？？
     :param priors_cxcy: prior boxes with respect to which the encoding must be performed, a tensor of size (n_priors, 4)
     :return: encoded bounding boxes, a tensor of size (n_priors, 4)
     """
-
     # The 10 and 5 below are referred to as 'variances' in the original Caffe repo, completely empirical
     # They are for some sort of numerical conditioning, for 'scaling the localization gradient'
     # See https://github.com/weiliu89/caffe/issues/155
-    return torch.cat([(cxcy[:, :2] - priors_cxcy[:, :2]) / (priors_cxcy[:, 2:] / 10),  # g_c_x, g_c_y
-                      torch.log(cxcy[:, 2:] / priors_cxcy[:, 2:]) * 5], 1)  # g_w, g_h
+    # if (cxcy[:, 2:] / priors_cxcy[:, 2:])
+    # -inf 就应该是这里出来的，如果真数是0就会-inf,这里也就是 cxcy[:, 2:] / priors_cxcy[:, 2:] 这里有0，那就是cxcy[:, 2:]有0，也就是从label转换出来的w,h里有0，看log应该是cy为0
+    # for idx, tensor in enumerate((torch.log(cxcy[:, 2:] / priors_cxcy[:, 2:]) * 5)):
+    #     if float('-inf') in (torch.log(cxcy[:, 2:] / priors_cxcy[:, 2:]) * 5):
+    #         print("bug caught ---------> %d" % idx)
+    #         print(tensor)
+    # 这个编码也没什么问题，
+    return torch.cat([(cxcy[:, :2] - priors_cxcy[:, :2]) / (priors_cxcy[:, 2:] / 10),  # g_c_x, g_c_y  # 与中心点距离成正比，box和prior的中线点距离很远，那么这里就会大
+                      torch.log(cxcy[:, 2:] / priors_cxcy[:, 2:]) * 5], 1)  # g_w, g_h 与w,h的差值成正比，差值越大，loss也越大
 
 
+# 这个是解码，detect时才用
 def gcxgcy_to_cxcy(gcxgcy, priors_cxcy):
     """
     Decode bounding box coordinates predicted by the model, since they are encoded in the form mentioned above.
@@ -335,31 +362,37 @@ def gcxgcy_to_cxcy(gcxgcy, priors_cxcy):
     """
 
     return torch.cat([gcxgcy[:, :2] * priors_cxcy[:, 2:] / 10 + priors_cxcy[:, :2],  # c_x, c_y
-                      torch.exp(gcxgcy[:, 2:] / 5) * priors_cxcy[:, 2:]], 1)  # w, h
+                      torch.exp(gcxgcy[:, 2:] / 5) * priors_cxcy[:, 2:]], 1)  # w, h 这里
 
 
 def find_intersection(set_1, set_2):
     """
     Find the intersection of every box combination between two sets of boxes that are in boundary coordinates.
 
-    :param set_1: set 1, a tensor of dimensions (n1, 4)
-    :param set_2: set 2, a tensor of dimensions (n2, 4)
+    :param set_1: set 1, a tensor of dimensions (n1, 4) 这个是标注的box  [1,4]
+    :param set_2: set 2, a tensor of dimensions (n2, 4) 这个是prior_box [2278,4]
     :return: intersection of each of the boxes in set 1 with respect to each of the boxes in set 2, a tensor of dimensions (n1, n2)
     """
-
     # PyTorch auto-broadcasts singleton dimensions
+    # 前两列是xmin,ymin
+    # 求max就是求两个方框的intersection的左上角
+    # 用unsqueeze把两个set的维度错开，可以使set_1和所有set_2里的比较，返回的结果是(n1,n2,2),意味着每一个label_box都和prior_box进行了比较
     lower_bounds = torch.max(set_1[:, :2].unsqueeze(1), set_2[:, :2].unsqueeze(0))  # (n1, n2, 2)
+    # 同上
     upper_bounds = torch.min(set_1[:, 2:].unsqueeze(1), set_2[:, 2:].unsqueeze(0))  # (n1, n2, 2)
-    intersection_dims = torch.clamp(upper_bounds - lower_bounds, min=0)  # (n1, n2, 2)
-    return intersection_dims[:, :, 0] * intersection_dims[:, :, 1]  # (n1, n2)
+    # 这里相减分别得到[width,height] 也就是(n1,n1,2)中的第三个维度2中的两个值
+    # clamp保证大于0
+    intersection_dims = torch.clamp(upper_bounds - lower_bounds, min=0)  # (n1, n2, 2) 
+    # 长宽相乘就是面积，然后那个维度本来两个数变成了一个数，所以只剩下(n1,n2)
+    return intersection_dims[:, :, 0] * intersection_dims[:, :, 1]  # (n1, n2) 
 
 
 def find_jaccard_overlap(set_1, set_2):
     """
     Find the Jaccard Overlap (IoU) of every box combination between two sets of boxes that are in boundary coordinates.
 
-    :param set_1: set 1, a tensor of dimensions (n1, 4)
-    :param set_2: set 2, a tensor of dimensions (n2, 4)
+    :param set_1: set 1, a tensor of dimensions (n1, 4) 这个是标注的box
+    :param set_2: set 2, a tensor of dimensions (n2, 4) 这个是prior_box
     :return: Jaccard Overlap of each of the boxes in set 1 with respect to each of the boxes in set 2, a tensor of dimensions (n1, n2)
     """
 
@@ -367,11 +400,14 @@ def find_jaccard_overlap(set_1, set_2):
     intersection = find_intersection(set_1, set_2)  # (n1, n2)
 
     # Find areas of each box in both sets
+    # label_box的面积
     areas_set_1 = (set_1[:, 2] - set_1[:, 0]) * (set_1[:, 3] - set_1[:, 1])  # (n1)
+    # prior_box的面积(这个应该是固定的，算一次就够了)
     areas_set_2 = (set_2[:, 2] - set_2[:, 0]) * (set_2[:, 3] - set_2[:, 1])  # (n2)
 
     # Find the union
     # PyTorch auto-broadcasts singleton dimensions
+    # 这里让set_1,set_2维度错开,就可以保证每个set_1元素都和每个set_2元素进行比较
     union = areas_set_1.unsqueeze(1) + areas_set_2.unsqueeze(0) - intersection  # (n1, n2)
 
     return intersection / union  # (n1, n2)
@@ -614,19 +650,20 @@ def transform(image, boxes, labels, difficulties, split):
 
         # Expand image (zoom out) with a 50% chance - helpful for training detection of small objects
         # Fill surrounding space with the mean of ImageNet data that our base VGG was trained on
-        if random.random() < 0.5:
-            new_image, new_boxes = expand(new_image, boxes, filler=mean)
+        # # 这个不太好，zoom out 以后很多目标特别小
+        # if random.random() < 0.5:
+        #     new_image, new_boxes = expand(new_image, boxes, filler=mean)
 
-        # Randomly crop image (zoom in)
-        new_image, new_boxes, new_labels, new_difficulties = random_crop(new_image, new_boxes, new_labels,
-                                                                         new_difficulties)
+        # # Randomly crop image (zoom in)
+        # new_image, new_boxes, new_labels, new_difficulties = random_crop(new_image, new_boxes, new_labels,
+        #                                                                  new_difficulties)
 
         # Convert Torch tensor to PIL image
         new_image = FT.to_pil_image(new_image)
 
-        # Flip image with a 50% chance
-        if random.random() < 0.5:
-            new_image, new_boxes = flip(new_image, new_boxes)
+        # # Flip image with a 50% chance
+        # if random.random() < 0.5:
+        #     new_image, new_boxes = flip(new_image, new_boxes)
 
     # Resize image to (300, 300) - this also converts absolute boundary coordinates to their fractional form
     new_image, new_boxes = resize(new_image, new_boxes, dims=(300, 300))

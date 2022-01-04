@@ -25,6 +25,11 @@ mbv3_large.old.pth.tar
 
  使用步骤
 一 下载VOC数据集之后,将VOCtrainval_06-Nov-2007和VOCtest_06-Nov-2007合并在一起
+Annotations/.xml 
+JPEGImages/.jpg 
+ImageSets/Main/test.txt 
+ImageSets/Main/trainval.txt 
+
 数据集下载 可以看这里
 https://blog.csdn.net/flyfish1986/article/details/95367745
 

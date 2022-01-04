@@ -24,8 +24,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # Learning parameters
-checkpoint =None #  path to model checkpoint, None if none './checkpoint_ssd300.pth.tar'
-batch_size = 64  # batch size 
+checkpoint =None #  path to model checkpoint, None if none
+batch_size = 4  # batch size 
 # iterations = 120000  # number of iterations to train  120000
 workers = 8  # number of workers for loading data in the DataLoader 4
 print_freq = 100  # print training status every __ batches
@@ -45,14 +45,16 @@ std = [0.229, 0.224, 0.225]
 
 def main():
     """
-    Training.
+    Testing.
     """
     global start_epoch, label_map, epoch, checkpoint, decay_lr_at
+    # print(n_classes)
     # Initialize model or load checkpoint
     if checkpoint is None:
         print("checkpoint none")
         start_epoch = 0
         model = SSD300(n_classes=n_classes)
+        # print(model)
         # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
         biases = list()
         not_biases = list()
@@ -96,7 +98,7 @@ def main():
                                      split='train',
                                      keep_difficult=keep_difficult)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                                                collate_fn=train_dataset.collate_fn, num_workers=workers,#
+                                               collate_fn=train_dataset.collate_fn, num_workers=workers,
                                                pin_memory=True)  # note that we're passing the collate function here
 
     # Calculate total number of epochs to train and the epochs to decay learning rate at (i.e. convert iterations to epochs)
@@ -153,158 +155,150 @@ def train(train_loader, model, criterion, optimizer, epoch):
     for i, (images, boxes, labels, _) in enumerate(train_loader):
         data_time.update(time.time() - start)
 
-        # if(i%200==0):
-        #     adjust_learning_rate_iter(optimizer,epoch)
-        #     print("batch id:",i)#([8, 3, 300, 300])
-        #N=8
+        print(images.shape)
+        print(len(boxes))
+        print(len(labels))
+        print(boxes[0])
+        #tensor([[0.5078, 0.1708, 0.7931, 0.4469],
+        # [0.8075, 0.2514, 0.8841, 0.4383],
+        # [0.7863, 0.3074, 0.8324, 0.3786],
+        # [0.8336, 0.2135, 0.8461, 0.2306]])
+        print(labels[0])
+        # tensor([60, 57, 29, 66])
+
         # Move to default device
         images = images.to(device)  # (batch_size (N), 3, 300, 300)
         
         boxes = [b.to(device) for b in boxes]
         labels = [l.to(device) for l in labels]
         
-        # Forward prop.
-        # 把每一层的feature也返回
+
+
+        # # Forward prop.
+        # # 把每一层的feature也返回
         predicted_locs, predicted_scores, feats_list = model(images)  # (N, anchor_boxes_size, 4), (N, anchor_boxes_size, n_classes)
-
-        # Loss 这里把标注信息和预测信息作为输入，算出Loss 就是MultiBoxLoss的forward,但是这部分不在模型里的
-        #                 预测出来的额       预测出来的       标签     标签
-        # loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar MultiBoxLoss
-        # 把分开的也返回出来，可视化用
-        loss, conf_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar MultiBoxLoss
-        train_loss = loss
-        #print("training",train_loss)
-
-        # Backward prop.
-        optimizer.zero_grad()
-        loss.backward()
-
-        # Clip gradients, if necessary
-        if grad_clip is not None:
-            clip_gradient(optimizer, grad_clip)
-
-        # Update model
-        optimizer.step()
-        # print(" loss : %d"%loss.item())
-        losses.update(loss.item(), images.size(0))
-        batch_time.update(time.time() - start)
-
-        start = time.time()
+        print("predicted_locs shape")
+        print(predicted_locs.shape)
+        print("predicted_scores shape")
+        print(predicted_scores.shape)
         
-        # Print status
-        if i % print_freq == 0:#200个iter打印一次
-            print('Epoch: [{0}][{1}/{2}][{3}]\t'
-                  'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(epoch, i, len(train_loader),optimizer.param_groups[1]['lr'],
-                                                                  batch_time=batch_time,
-                                                                  data_time=data_time, loss=losses))
-            global writer_count
-            writer.add_scalar('learning rate', optimizer.param_groups[1]['lr'], global_step=writer_count)
-            writer.add_scalar('loss/train loss', train_loss, global_step=writer_count)
-            writer.add_scalar('loss/conf_loss', conf_loss, global_step=writer_count)
-            writer.add_scalar('loss/loc_loss', loc_loss, global_step=writer_count)
 
-            tensor_for_show = images[0]
-            global mean
-            global std
-            tensor_for_show[0] = tensor_for_show[0]*std[0] + mean[0]
-            tensor_for_show[1] = tensor_for_show[1]*std[1] + mean[1]
-            tensor_for_show[2] = tensor_for_show[2]*std[2] + mean[2]
-            image_for_show = transforms.ToPILImage()(tensor_for_show)
-            image_for_show_det = transforms.ToPILImage()(tensor_for_show)
-            draw =ImageDraw.Draw(image_for_show)
-            det_draw =ImageDraw.Draw(image_for_show_det)
-            # 都是300x300
-            # print(image_for_show.size[0])# width
-            # print(image_for_show.size[1])# height
-            # 原始标签是(xmin,ymin,xmax,ymax)
-            # print(len(boxes))# batch_size
-            boxes_for_show = boxes[0]#第一个图片里有几个box
-            labels_for_show = labels[0]
-            # print(boxes_for_show.shape)
-            # print(box[0,0].item())#xmin
-            # print(box[0,1].item())#ymin
-            # print(box[0,2].item())#xmax
-            # print(box[0,3].item())#ymax
-            for i in range(boxes_for_show.size(0)):#每一个box都画出来
-                # 先找到类别
-                label_idx = labels_for_show[i].item()
-                label = rev_label_map[label_idx]
-                color = label_color_map[label]
-                # 画box
-                box = boxes_for_show[i]
-                tl_x = box[0].item() * image_for_show.size[0]
-                tl_y = box[1].item() * image_for_show.size[1]
-                dr_x = box[2].item() * image_for_show.size[0]
-                dr_y = box[3].item() * image_for_show.size[1]
-                draw.rectangle((tl_x, tl_y, dr_x, dr_y), fill=None, outline=color,width=1)
-                # 画标签
-                draw.text((tl_x, tl_y),label,color)
+        # # Loss 这里把标注信息和预测信息作为输入，算出Loss 就是MultiBoxLoss的forward,但是这部分不在模型里的
+        # #                 预测出来的额       预测出来的       标签     标签
+        # loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar MultiBoxLoss
+        # # 把分开的也返回出来，可视化用
+                                                                         # tensor([60, 57, 29, 66])              
+        loss, conf_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar MultiBoxLoss
+        # train_loss = loss
+        # #print("training",train_loss)
 
-            # 使用当前模型检测
-            det_boxes_batch, det_labels_batch, det_scores_batch = model.detect_objects(predicted_locs, predicted_scores,
-                                                                                       min_score=0.1, max_overlap=0.7,
-                                                                                       top_k=10)
-            det_boxes_for_show = det_boxes_batch[0]# 第一个图片的boxes
-            det_labels_for_show = det_labels_batch[0]# 第一个图片的boxes
-            det_scores_for_show = det_scores_batch[0]# 第一个图片的boxes
-            for i in range(len(det_boxes_for_show)):
-                det_box = det_boxes_for_show[i]
-                det_label_idx = det_labels_for_show[i].item()
-                det_label = rev_label_map[det_label_idx]
-                det_color = label_color_map[det_label]
-                det_score = det_scores_for_show[i].item()
-                # 画box
-                tl_x = det_box[0].item() * image_for_show.size[0]
-                tl_y = det_box[1].item() * image_for_show.size[1]
-                dr_x = det_box[2].item() * image_for_show.size[0]
-                dr_y = det_box[3].item() * image_for_show.size[1]
-                det_draw.rectangle((tl_x, tl_y, dr_x, dr_y), fill=None, outline=det_color,width=1)
-                # 画标签
-                det_draw.text((tl_x, tl_y),det_label,det_color)
-                # 画得分
-                det_draw.text((dr_x, dr_y),str(det_score),det_color)
+        # # Backward prop.
+        # optimizer.zero_grad()
+        # loss.backward()
+
+        # # Clip gradients, if necessary
+        # if grad_clip is not None:
+        #     clip_gradient(optimizer, grad_clip)
+
+        # # Update model
+        # optimizer.step()
+
+        # losses.update(loss.item(), images.size(0))
+        # batch_time.update(time.time() - start)
+
+        # start = time.time()
+        
+        # # Print status
+        # if i % print_freq == 0:#200个iter打印一次
+        #     print('Epoch: [{0}][{1}/{2}][{3}]\t'
+        #           'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+        #           'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
+        #           'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(epoch, i, len(train_loader),optimizer.param_groups[1]['lr'],
+        #                                                           batch_time=batch_time,
+        #                                                           data_time=data_time, loss=losses))
+        #     # global writer_count
+            # writer.add_scalar('learning rate', optimizer.param_groups[1]['lr'], global_step=writer_count)
+            # writer.add_scalar('loss/train loss', train_loss, global_step=writer_count)
+            # writer.add_scalar('loss/conf_loss', conf_loss, global_step=writer_count)
+            # writer.add_scalar('loss/loc_loss', loc_loss, global_step=writer_count)
+
+            # tensor_for_show = images[0]
+            # global mean
+            # global std
+            # tensor_for_show[0] = tensor_for_show[0]*std[0] + mean[0]
+            # tensor_for_show[1] = tensor_for_show[1]*std[1] + mean[1]
+            # tensor_for_show[2] = tensor_for_show[2]*std[2] + mean[2]
+            # image_for_show = transforms.ToPILImage()(tensor_for_show)
+            # image_for_show_det = transforms.ToPILImage()(tensor_for_show)
+            # draw =ImageDraw.Draw(image_for_show)
+            # det_draw =ImageDraw.Draw(image_for_show_det)
+            # # 都是300x300
+            # # print(image_for_show.size[0])# width
+            # # print(image_for_show.size[1])# height
+            # # 原始标签是(xmin,ymin,xmax,ymax)
+            # # print(len(boxes))# batch_size
+            # boxes_for_show = boxes[0]#第一个图片里有几个box
+            # labels_for_show = labels[0]
+            # # print(boxes_for_show.shape)
+            # # print(box[0,0].item())#xmin
+            # # print(box[0,1].item())#ymin
+            # # print(box[0,2].item())#xmax
+            # # print(box[0,3].item())#ymax
+            # for i in range(boxes_for_show.size(0)):#每一个box都画出来
+            #     # 先找到类别
+            #     label_idx = labels_for_show[i].item()
+            #     label = rev_label_map[label_idx]
+            #     color = label_color_map[label]
+            #     # 画box
+            #     box = boxes_for_show[i]
+            #     tl_x = box[0].item() * image_for_show.size[0]
+            #     tl_y = box[1].item() * image_for_show.size[1]
+            #     dr_x = box[2].item() * image_for_show.size[0]
+            #     dr_y = box[3].item() * image_for_show.size[1]
+            #     draw.rectangle((tl_x, tl_y, dr_x, dr_y), fill=None, outline=color,width=1)
+            #     # 画标签
+            #     draw.text((tl_x, tl_y),label,color)
+
+            # # 使用当前模型检测
+            # det_boxes_batch, det_labels_batch, det_scores_batch = model.detect_objects(predicted_locs, predicted_scores,
+            #                                                                            min_score=0.1, max_overlap=0.7,
+            #                                                                            top_k=10)
+            # det_boxes_for_show = det_boxes_batch[0]# 第一个图片的boxes
+            # det_labels_for_show = det_labels_batch[0]# 第一个图片的boxes
+            # det_scores_for_show = det_scores_batch[0]# 第一个图片的boxes
+            # for i in range(len(det_boxes_for_show)):
+            #     det_box = det_boxes_for_show[i]
+            #     det_label_idx = det_labels_for_show[i].item()
+            #     det_label = rev_label_map[det_label_idx]
+            #     det_color = label_color_map[det_label]
+            #     det_score = det_scores_for_show[i].item()
+            #     # 画box
+            #     tl_x = det_box[0].item() * image_for_show.size[0]
+            #     tl_y = det_box[1].item() * image_for_show.size[1]
+            #     dr_x = det_box[2].item() * image_for_show.size[0]
+            #     dr_y = det_box[3].item() * image_for_show.size[1]
+            #     det_draw.rectangle((tl_x, tl_y, dr_x, dr_y), fill=None, outline=det_color,width=1)
+            #     # 画标签
+            #     det_draw.text((tl_x, tl_y),det_label,det_color)
+            #     # 画得分
+            #     det_draw.text((dr_x, dr_y),str(det_score),det_color)
             
-            # print(len(feats_list))
-            for i in range(len(feats_list)):#6个尺度的features
-                layer_features = feats_list[i]
-                layer_feat = layer_features[0]# 第一个图片的features
-                for j in range(layer_feat.shape[0]):
-                    layer_feature_0 = layer_feat[j:j+1,:,:]
-                # layer_feature_0 = layer_feat[:1,:,:]
-                    writer.add_image("layer_"+str(i)+"_features/"+str(j), layer_feature_0, global_step=writer_count, walltime=None, dataformats='CHW')
+            # # print(len(feats_list))
+            # for i in range(len(feats_list)):#6个尺度的features
+            #     layer_features = feats_list[i]
+            #     layer_feat = layer_features[0]# 第一个图片的features
+            #     for j in range(layer_feat.shape[0]):
+            #         layer_feature_0 = layer_feat[j:j+1,:,:]
+            #     # layer_feature_0 = layer_feat[:1,:,:]
+            #         writer.add_image("layer_"+str(i)+"_features/"+str(j), layer_feature_0, global_step=writer_count, walltime=None, dataformats='CHW')
 
-            tensor_for_show = FT.to_tensor(image_for_show)
-            det_tensor_for_show = FT.to_tensor(image_for_show_det)
-            writer.add_image("results/ground truth", tensor_for_show, global_step=writer_count, walltime=None, dataformats='CHW')
-            writer.add_image("results/detection", det_tensor_for_show, global_step=writer_count, walltime=None, dataformats='CHW')
-            writer_count+=1
+            # tensor_for_show = FT.to_tensor(image_for_show)
+            # det_tensor_for_show = FT.to_tensor(image_for_show_det)
+            # writer.add_image("results/ground truth", tensor_for_show, global_step=writer_count, walltime=None, dataformats='CHW')
+            # writer.add_image("results/detection", det_tensor_for_show, global_step=writer_count, walltime=None, dataformats='CHW')
+            # writer_count+=1
         #break #test
     del predicted_locs, predicted_scores, images, boxes, labels, image_for_show, tensor_for_show  # free some memory since their histories may be stored
-
-
-# 这两个参数没有用到
-def adjust_learning_rate_epoch(optimizer,cur_epoch):
-    """
-    Scale learning rate by a specified factor.
-
-    :param optimizer: optimizer whose learning rate must be shrunk.
-    :param scale: factor to multiply learning rate with.
-    """
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = param_group['lr'] * 0.1
-    print("DECAYING learning rate. The new LR is %f\n" % (optimizer.param_groups[1]['lr'],))
-
-#warmup ,how much learning rate.
-def adjust_learning_rate_iter(optimizer,cur_epoch):
-
-    if(cur_epoch==0 or cur_epoch==1 ):
-        for param_group in optimizer.param_groups:
-            param_group['lr'] =param_group['lr'] +  0.0001  
-            print("DECAYING learning rate iter.  The new LR is %f\n" % (optimizer.param_groups[1]['lr'],))
-
-      
 
 
 if __name__ == '__main__':

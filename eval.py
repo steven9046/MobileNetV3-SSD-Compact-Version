@@ -2,6 +2,7 @@ from utils import *
 from datasets import PascalVOCDataset
 from tqdm import tqdm
 from pprint import PrettyPrinter
+import sys
 
 # Good formatting when printing the APs for each class and mAP
 pp = PrettyPrinter()
@@ -56,7 +57,7 @@ def evaluate(test_loader, model):
             images = images.to(device)  # (N, 3, 300, 300)
 
             # Forward prop.
-            predicted_locs, predicted_scores = model(images)
+            predicted_locs, predicted_scores,feats_list = model(images)
 
             # Detect objects in SSD output
             det_boxes_batch, det_labels_batch, det_scores_batch = model.detect_objects(predicted_locs, predicted_scores,
@@ -78,7 +79,8 @@ def evaluate(test_loader, model):
 
         # Calculate mAP
         APs, mAP = calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties)
-
+    
+    sys.stdout = open('./output.txt','wt')
     # Print AP for each class
     pp.pprint(APs)
 

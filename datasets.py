@@ -36,7 +36,7 @@ class PascalVOCDataset(Dataset):
         # Read image
         image = Image.open(self.images[i], mode='r')
         image = image.convert('RGB')
-
+        # print("getting image: %s"%self.images[i])
         # Read objects in this image (bounding boxes, labels, difficulties)
         objects = self.objects[i]
         boxes = torch.FloatTensor(objects['boxes'])  # (n_objects, 4)
@@ -48,9 +48,27 @@ class PascalVOCDataset(Dataset):
             boxes = boxes[1 - difficulties]
             labels = labels[1 - difficulties]
             difficulties = difficulties[1 - difficulties]
-
+        # print("image size: ", image.size[0], image.size[1])
+        # print("boxes before transform :", boxes.shape)#[3,4]
+        # print("labels before transform :", labels.shape)#[3]
+        # for i in range(boxes.size(0)):
+        #     print("box: ")
+        #     print(boxes[i, 0].item())
+        #     print(boxes[i, 1].item())
+        #     print(boxes[i, 2].item())
+        #     print(boxes[i, 3].item())
         # Apply transformations
         image, boxes, labels, difficulties = transform(image, boxes, labels, difficulties, split=self.split)
+        # print("image tensor shape:")
+        # print(image.shape)
+        # print("boxes after transform :", boxes.shape)#[3,4]
+        # print("labels after transform :", labels.shape)#[3]
+        # for i in range(boxes.shape[0]):
+        #     print("box: ")
+        #     print(boxes[i, 0].item())
+        #     print(boxes[i, 1].item())
+        #     print(boxes[i, 2].item())
+        #     print(boxes[i, 3].item())
 
         return image, boxes, labels, difficulties
 
@@ -68,12 +86,12 @@ class PascalVOCDataset(Dataset):
         :param batch: an iterable of N sets from __getitem__()
         :return: a tensor of images, lists of varying-size tensors of bounding boxes, labels, and difficulties
         """
-
+        # print("arranging tensor shape....")
         images = list()
         boxes = list()
         labels = list()
         difficulties = list()
-
+        # 从dataset里得到一个batch的数据，每个batch里是dataset的get item返回的东西
         for b in batch:
             images.append(b[0])
             boxes.append(b[1])
@@ -81,5 +99,5 @@ class PascalVOCDataset(Dataset):
             difficulties.append(b[3])
 
         images = torch.stack(images, dim=0)
-
+        # print("Done")
         return images, boxes, labels, difficulties  # tensor (N, 3, 300, 300), 3 lists of N tensors each

@@ -1,5 +1,5 @@
 from torchvision import transforms
-from utils import *
+from coco_utils import *
 from PIL import Image, ImageDraw, ImageFont
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
